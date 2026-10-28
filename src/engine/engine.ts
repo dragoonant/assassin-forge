@@ -3,7 +3,7 @@ import { DEFAULT_CONFIG, type MatchConfig } from './config';
 import { nextRandom } from './rng';
 import type {
   ActionCard, Agent, AgentCard, CardInst, Command, Effect, MatchState, PlayerId, PlayerState,
-  RegionScope, Target,
+  RegionScope, ScenarioRules, Target,
 } from './types';
 
 export interface MatchSetup {
@@ -12,6 +12,7 @@ export interface MatchSetup {
   names?: [string, string];
   regions?: string[];
   config?: Partial<MatchConfig>;
+  scenario?: ScenarioRules;
 }
 
 interface EffectContext {
@@ -28,9 +29,11 @@ export const opponent = (p: PlayerId): PlayerId => (p === 0 ? 1 : 0);
 export function createMatch(setup: MatchSetup): MatchState {
   const config = { ...DEFAULT_CONFIG, ...setup.config };
   const names = setup.names ?? ['Player', 'Opponent'];
+  const scenario = setup.scenario ?? {};
   const s: MatchState = {
     tick: 0,
     config,
+    scenario,
     rng: setup.seed >>> 0,
     nextUid: 1,
     players: [makePlayer(names[0], config), makePlayer(names[1], config)],
@@ -47,7 +50,23 @@ export function createMatch(setup: MatchSetup): MatchState {
     s.players[p].deck = setup.decks[p].map((cardId) => ({ uid: s.nextUid++, cardId }));
     shuffle(s, s.players[p].deck);
     draw(s, p, config.handSize);
+    if (scenario.startingGold) s.players[p].gold = scenario.startingGold[p];
+    if (scenario.income) s.players[p].income = scenario.income[p];
+    scenario.startingInfluence?.[p].forEach((n, region) => {
+      if (n > 0 && s.regions[region]) gainInfluence(s, region, p, n);
+    });
   }
+  for (const x of scenario.startingSites ?? []) {
+    s.sites.push({ uid: s.nextUid++, cardId: x.cardId, owner: x.player, region: x.region, built: true, until: 0 });
+  }
+  for (const x of scenario.startingAgents ?? []) {
+    const card = getCard(x.cardId) as AgentCard;
+    s.agents.push({
+      uid: s.nextUid++, cardId: card.id, owner: x.player, strength: card.strength, maxStrength: card.strength,
+      influence: card.influence, status: 'ready', region: null, since: 0, until: 0,
+    });
+  }
+  s.log = [];
   return s;
 }
 
@@ -265,10 +284,16 @@ function dusk(s: MatchState): void {
     if (card.influence > 0) gainInfluence(s, site.region, site.owner, card.influence);
     runEffects(s, card.daily, { owner: site.owner, here: site.region });
   }
+  for (const x of s.scenario.duskEffects ?? []) {
+    runEffects(s, x.effects, { owner: x.player });
+    log(s, x.player, x.text);
+  }
 
   const controlled = [0, 1].map((p) => s.regions.filter((r) => r.controller === p).length);
   if (controlled[0] >= s.config.regionsToWin || controlled[1] >= s.config.regionsToWin) {
     s.winner = controlled[0] > controlled[1] ? 0 : 1;
+  } else if (s.scenario.survive && day >= s.scenario.survive.days) {
+    s.winner = s.scenario.survive.player;
   } else if (day >= s.config.maxDays) {
     const total = [0, 1].map((p) => s.regions.reduce((sum, r) => sum + r.influence[p], 0));
     if (controlled[0] !== controlled[1]) s.winner = controlled[0] > controlled[1] ? 0 : 1;
@@ -292,7 +317,7 @@ function dusk(s: MatchState): void {
 function resolveCampaign(s: MatchState, a: Agent): void {
   const region = a.region!;
   const card = getCard(a.cardId) as AgentCard;
-  const enemy = hasKeyword(a, 'stealth')
+  const enemy = hasKeyword(a, 'stealth') || s.scenario.noClashes
     ? undefined
     : agentsIn(s, region, opponent(a.owner))
         .filter((e) => !hasKeyword(e, 'stealth'))

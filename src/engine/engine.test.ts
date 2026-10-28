@@ -248,3 +248,55 @@ describe('AI vs AI', () => {
     }
   });
 });
+
+describe('scenario rules', () => {
+  const base = { seed: 1, decks: [filler, filler] as [string[], string[]] };
+
+  it('applies starting influence, gold, income, sites and agents', () => {
+    const s = createMatch({
+      ...base,
+      scenario: {
+        startingInfluence: [[0, 2, 0], [10, 0, 1]],
+        startingGold: [7, 1],
+        income: [2, 3],
+        startingSites: [{ player: 1, cardId: 'chapel', region: 2 }],
+        startingAgents: [{ player: 0, cardId: 'city-guard' }],
+      },
+    });
+    expect(s.regions.map((r) => r.influence)).toEqual([[0, 10], [2, 0], [0, 1]]);
+    expect(s.regions[0].controller).toBe(1);
+    expect([s.players[0].gold, s.players[1].gold]).toEqual([7, 1]);
+    expect([s.players[0].income, s.players[1].income]).toEqual([2, 3]);
+    expect(s.sites[0]).toMatchObject({ owner: 1, region: 2, built: true });
+    expect(s.agents[0]).toMatchObject({ owner: 0, cardId: 'city-guard', status: 'ready' });
+    expect(s.log).toEqual([]);
+  });
+
+  it('runs dusk effects every day', () => {
+    const s = createMatch({
+      ...base,
+      scenario: { duskEffects: [{ player: 1, effects: [{ kind: 'influence', amount: 1, region: 'all' }], text: 'Mutiny.' }] },
+    });
+    run(s, s.config.ticksPerDay * 2);
+    expect(s.regions.map((r) => r.influence[1])).toEqual([2, 2, 2]);
+  });
+
+  it('lets the surviving player win at the given dusk', () => {
+    const s = createMatch({ ...base, scenario: { survive: { player: 0, days: 2 } } });
+    run(s, s.config.ticksPerDay);
+    expect(s.winner).toBeNull();
+    run(s, s.config.ticksPerDay);
+    expect(s.winner).toBe(0);
+  });
+
+  it('never clashes in fog', () => {
+    const s = createMatch({ ...base, scenario: { noClashes: true } });
+    const guard = recruit(s, 0, 'city-guard');
+    const monk = recruit(s, 1, 'mendicant-monk');
+    run(s, s.config.halfDay);
+    apply(s, { type: 'send', player: 1, agentUid: monk, region: 0 });
+    apply(s, { type: 'send', player: 0, agentUid: guard, region: 0 });
+    run(s, s.config.halfDay);
+    expect(s.regions[0].influence).toEqual([1, 2]);
+  });
+});

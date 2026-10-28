@@ -11,11 +11,22 @@ const AI: PlayerId = 1;
 
 type Selection = { kind: 'card'; uid: number } | { kind: 'agent'; uid: number } | null;
 
-export function Match({ setup, aiThinkEvery, onExit }: {
+export interface MatchBriefing {
+  title: string;
+  objective: string;
+  tips?: string[];
+}
+
+export function Match({ setup, aiThinkEvery, briefing, onExit, onFinish, onRetry }: {
   setup: MatchSetup;
   /** Ticks between AI decisions: lower is a faster, harder opponent. */
   aiThinkEvery: number;
+  /** Campaign battles show their objective and tips. */
+  briefing?: MatchBriefing;
   onExit: () => void;
+  /** Called from the end-of-match overlay; when set, it replaces "Back to menu". */
+  onFinish?: (winner: PlayerId | 'draw') => void;
+  onRetry?: () => void;
 }) {
   const stateRef = useRef<MatchState | null>(null);
   if (!stateRef.current) stateRef.current = createMatch(setup);
@@ -108,18 +119,20 @@ export function Match({ setup, aiThinkEvery, onExit }: {
     }
   };
 
+  const tips = briefing?.tips ?? [];
+  const tip = tips.length ? tips[Math.floor(s.tick / (s.config.ticksPerDay * 1.5)) % tips.length] : undefined;
   const hint = selAgent
     ? `Choose a region for ${getCard(selAgent.cardId).name} to campaign in.`
     : selCard
       ? `Choose a target for ${selCard.name}. (Esc to cancel)`
-      : 'Play cards from your hand. Click a ready agent, then a region, to campaign.';
+      : tip ?? briefing?.objective ?? 'Play cards from your hand. Click a ready agent, then a region, to campaign.';
 
   const tokenProps = { s, isTarget, selectedUid: selAgent?.uid, onAgent, onSite };
 
   return (
     <div className="match">
       <header className="topbar">
-        <button type="button" className="link" onClick={onExit}>← Menu</button>
+        <button type="button" className="link" onClick={onExit}>← {briefing ? 'Campaign' : 'Menu'}</button>
         <Timeline s={s} />
         <div className="speed" role="group" aria-label="Speed">
           {[0, 1, 2, 4].map((v) => (
@@ -129,6 +142,10 @@ export function Match({ setup, aiThinkEvery, onExit }: {
           ))}
         </div>
       </header>
+
+      {briefing && (
+        <div className="objective"><strong>{briefing.title}</strong> · {briefing.objective}</div>
+      )}
 
       <PlayerStrip {...tokenProps} p={AI} />
 
@@ -185,9 +202,16 @@ export function Match({ setup, aiThinkEvery, onExit }: {
             <p>
               {s.winner === 'draw'
                 ? 'Neither side could seize the city.'
-                : `${s.players[s.winner].name} controls the city after ${dayOf(s) - 1} days.`}
+                : s.scenario.survive?.player === s.winner && s.regions.filter((r) => r.controller === s.winner).length < 2
+                  ? `${s.players[s.winner].name} held out for ${dayOf(s) - 1} days.`
+                  : `${s.players[s.winner].name} controls the city after ${dayOf(s) - 1} days.`}
             </p>
-            <button type="button" className="primary" onClick={onExit}>Back to menu</button>
+            <div className="overlay-actions">
+              {onRetry && s.winner !== HUMAN && <button type="button" onClick={onRetry}>Retry</button>}
+              {onFinish
+                ? <button type="button" className="primary" onClick={() => onFinish(s.winner!)}>Continue</button>
+                : <button type="button" className="primary" onClick={onExit}>Back to menu</button>}
+            </div>
           </div>
         </div>
       )}

@@ -181,3 +181,52 @@ small { color: var(--muted); }
   .timeline { order: 3; flex-basis: 100%; }
   .card { flex-basis: 130px; min-height: 150px; }
 }
+
+/* ── Card art ─────────────────────────────────────────────────────────── */
+.card-art { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; background: #fff; }
+
+/* ── Campaign ─────────────────────────────────────────────────────────── */
+.hero {
+  display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 24px; padding: 18px 20px; text-align: left;
+  background: linear-gradient(120deg, #3a2a16, #201a12); border: 1px solid var(--accent); border-radius: 10px;
+}
+.hero strong { font-size: 26px; }
+.hero span { color: var(--muted); }
+.hero .hero-kicker { color: var(--accent); text-transform: uppercase; letter-spacing: 2px; font-size: 12px; }
+.campaign .progress { margin: 4px 0 0; }
+.act h2 span { color: var(--text); text-transform: none; letter-spacing: 0; margin-left: 6px; }
+.battles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.battle {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px; text-align: left; min-height: 96px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+}
+.battle:hover:not(:disabled) { border-color: var(--accent); }
+.battle-place { font-size: 12px; color: var(--muted); }
+.battle-state { margin-top: auto; font-size: 12px; color: var(--accent); }
+.battle.is-done { border-color: #5d5030; }
+.battle.is-done .battle-state { color: #9fc48a; }
+.battle.is-locked { opacity: 0.45; cursor: not-allowed; }
+.reset { margin-top: 28px; }
+.objective {
+  padding: 6px 12px; border: 1px solid #5d5030; border-radius: 6px; background: #241e14; font-size: 13px;
+}
+.objective strong { color: var(--accent); }
+.overlay-actions { display: flex; gap: 10px; justify-content: center; }
+.overlay-actions button:not(.primary) { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 18px; }
+
+.scene {
+  min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 40px 16px;
+  background-size: cover; background-position: center; cursor: pointer;
+}
+.scene-box { width: 100%; max-width: 720px; cursor: default; }
+.scene-heading { color: var(--accent); text-transform: uppercase; letter-spacing: 2px; font-size: 12px; margin: 18px 0 4px; }
+.scene h1 { margin: 0 0 18px; font-size: 36px; }
+.scene-lines { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+.line { display: flex; gap: 12px; align-items: flex-start; animation: rise 300ms ease-out; }
+.line p { margin: 0; font-size: 17px; line-height: 1.5; }
+.line.narration p { color: #cdbfa3; font-style: italic; }
+.speaker { display: block; color: var(--accent); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+.portrait { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; object-position: top; background: #fff; border: 2px solid var(--line); flex: 0 0 auto; }
+.scene-objective { padding: 10px 14px; border-left: 3px solid var(--accent); background: rgba(0,0,0,0.3); }
+.continue { font-size: 13px; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

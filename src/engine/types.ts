@@ -130,9 +130,28 @@ export interface LogEntry {
   text: string;
 }
 
+/** Per-battle rule changes used by campaign battles. Everything is optional. */
+export interface ScenarioRules {
+  /** Influence each player starts with, per region. */
+  startingInfluence?: [number[], number[]];
+  startingGold?: [number, number];
+  income?: [number, number];
+  /** Sites already built when the battle starts. */
+  startingSites?: { player: PlayerId; cardId: string; region: number }[];
+  /** Agents already waiting, ready, at HQ when the battle starts. */
+  startingAgents?: { player: PlayerId; cardId: string }[];
+  /** Extra effects that run for a player at every dusk, before the win check. */
+  duskEffects?: { player: PlayerId; effects: Effect[]; text: string }[];
+  /** No campaign can be contested (fog, chaos): agents never clash. */
+  noClashes?: boolean;
+  /** This player wins if the opponent hasn't won by the dusk of this day. */
+  survive?: { player: PlayerId; days: number };
+}
+
 export interface MatchState {
   tick: number;
   config: MatchConfig;
+  scenario: ScenarioRules;
   rng: number;
   nextUid: number;
   players: [PlayerState, PlayerState];

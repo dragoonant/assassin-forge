@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { REGION_SETS, STARTER_DECKS } from '../data/decks';
 import type { MatchSetup } from '../engine/engine';
+import { Campaign } from './Campaign';
 import { Match } from './Match';
 
 const DIFFICULTY = [
@@ -13,6 +14,9 @@ export function App() {
   const [deck, setDeck] = useState(STARTER_DECKS[0].id);
   const [difficulty, setDifficulty] = useState(1);
   const [match, setMatch] = useState<{ setup: MatchSetup; key: number } | null>(null);
+  const [inCampaign, setInCampaign] = useState(false);
+
+  if (inCampaign) return <Campaign onExit={() => setInCampaign(false)} />;
 
   if (match) {
     return (
@@ -42,7 +46,13 @@ export function App() {
       <h1>Recollection <span>Revamp</span></h1>
       <p className="tagline">A real-time battle for Renaissance Italy. Unofficial fan project, for private use only.</p>
 
-      <h2>Choose your sequence</h2>
+      <button type="button" className="hero" onClick={() => setInCampaign(true)}>
+        <span className="hero-kicker">Campaign</span>
+        <strong>The Lodestone</strong>
+        <span>Italy, 1525–1527. Follow Isotta Ferro from a burned print shop in Venice to the Sack of Rome.</span>
+      </button>
+
+      <h2>Skirmish: choose your sequence</h2>
       <div className="decks">
         {STARTER_DECKS.map((d) => (
           <button key={d.id} type="button" className={`deck${deck === d.id ? ' is-on' : ''}`} onClick={() => setDeck(d.id)}>

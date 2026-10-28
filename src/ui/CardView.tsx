@@ -1,5 +1,6 @@
 import { SPECIALTY_LABEL } from '../data/cards';
 import type { Card } from '../engine/types';
+import { cardArt } from './art';
 
 const TYPE_LABEL = { agent: 'Agent', site: 'Site', action: 'Action' } as const;
 
@@ -10,6 +11,7 @@ export function CardView({ card, disabled, selected, onClick }: {
   onClick?: () => void;
 }) {
   const keywords = card.type === 'agent' ? card.keywords ?? [] : [];
+  const art = cardArt(card.id);
   return (
     <button
       type="button"
@@ -20,6 +22,7 @@ export function CardView({ card, disabled, selected, onClick }: {
         <span className="card-cost" title="Cost in gold">{card.cost}</span>
         <span className="card-name">{card.name}</span>
       </div>
+      {art && <img className="card-art" src={art} alt="" draggable={false} />}
       <div className="card-type">
         {card.unique ? '★ ' : ''}{TYPE_LABEL[card.type]} · {SPECIALTY_LABEL[card.specialty]}
         {card.type === 'action' && card.speed === 'quick' ? ' · Quick' : ''}

@@ -68,7 +68,7 @@ function bestSend(s: MatchState, p: PlayerId): Scored | null {
     for (let region = 0; region < s.regions.length; region++) {
       const cmd: Command = { type: 'send', player: p, agentUid: a.uid, region };
       if (validate(s, cmd)) continue;
-      const enemies = hasKeyword(a, 'stealth')
+      const enemies = hasKeyword(a, 'stealth') || s.scenario.noClashes
         ? []
         : agentsIn(s, region, opponent(p)).filter((e) => !hasKeyword(e, 'stealth'));
       let score: number;
