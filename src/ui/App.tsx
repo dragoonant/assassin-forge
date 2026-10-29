@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { REGION_SETS, STARTER_DECKS } from '../data/decks';
 import type { MatchSetup } from '../engine/engine';
 import { Campaign } from './Campaign';
-import { Match } from './Match';
+import { Match, SoundToggles } from './Match';
+import { useMusic } from './sound';
+
+const SKIRMISH_MUSIC = ['venice', 'florence', 'war', 'rome'];
 
 const DIFFICULTY = [
   { label: 'Easy', thinkEvery: 12 },
@@ -15,6 +18,7 @@ export function App() {
   const [difficulty, setDifficulty] = useState(1);
   const [match, setMatch] = useState<{ setup: MatchSetup; key: number } | null>(null);
   const [inCampaign, setInCampaign] = useState(false);
+  useMusic(!inCampaign && !match ? 'theme' : undefined);
 
   if (inCampaign) return <Campaign onExit={() => setInCampaign(false)} />;
 
@@ -24,6 +28,7 @@ export function App() {
         key={match.key}
         setup={match.setup}
         aiThinkEvery={DIFFICULTY[difficulty].thinkEvery}
+        music={SKIRMISH_MUSIC[match.key % SKIRMISH_MUSIC.length]}
         onExit={() => setMatch(null)}
       />
     );
@@ -43,6 +48,7 @@ export function App() {
 
   return (
     <main className="menu">
+      <div className="menu-bar"><SoundToggles /></div>
       <h1>Recollection <span>Revamp</span></h1>
       <p className="tagline">A real-time battle for Renaissance Italy. Unofficial fan project, for private use only.</p>
 

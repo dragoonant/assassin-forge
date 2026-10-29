@@ -2,7 +2,7 @@ import { getCard } from '../data/cards';
 import { DEFAULT_CONFIG, type MatchConfig } from './config';
 import { nextRandom } from './rng';
 import type {
-  ActionCard, Agent, AgentCard, CardInst, Command, Effect, MatchState, PlayerId, PlayerState,
+  ActionCard, Agent, AgentCard, CardInst, Command, Effect, LogKind, MatchState, PlayerId, PlayerState,
   RegionScope, ScenarioRules, Target,
 } from './types';
 
@@ -45,6 +45,7 @@ export function createMatch(setup: MatchSetup): MatchState {
     pending: [],
     winner: null,
     log: [],
+    logSeq: 0,
   };
   for (const p of [0, 1] as const) {
     s.players[p].deck = setup.decks[p].map((cardId) => ({ uid: s.nextUid++, cardId }));
@@ -93,8 +94,8 @@ function draw(s: MatchState, p: PlayerId, n: number): number {
   return drawn;
 }
 
-function log(s: MatchState, player: PlayerId | null, text: string): void {
-  s.log.push({ tick: s.tick, player, text });
+function log(s: MatchState, player: PlayerId | null, text: string, kind: LogKind): void {
+  s.log.push({ seq: s.logSeq++, tick: s.tick, player, text, kind });
   if (s.log.length > 200) s.log.splice(0, s.log.length - 200);
 }
 
@@ -193,7 +194,7 @@ export function apply(s: MatchState, cmd: Command): string | null {
       shuffle(s, pl.deck);
       draw(s, p, s.config.handSize);
       pl.canReshuffle = false;
-      log(s, p, `${pl.name} reshuffles their hand.`);
+      log(s, p, `${pl.name} reshuffles their hand.`, 'reshuffle');
       return null;
 
     case 'send': {
@@ -202,7 +203,7 @@ export function apply(s: MatchState, cmd: Command): string | null {
       a.region = cmd.region;
       a.since = s.tick;
       a.until = s.tick + halfDay;
-      log(s, p, `${getCard(a.cardId).name} campaigns in ${s.regions[cmd.region].name}.`);
+      log(s, p, `${getCard(a.cardId).name} campaigns in ${s.regions[cmd.region].name}.`, 'send');
       return null;
     }
 
@@ -217,17 +218,17 @@ export function apply(s: MatchState, cmd: Command): string | null {
           uid: inst.uid, cardId: card.id, owner: p, strength: card.strength, maxStrength: card.strength,
           influence: card.influence, status: 'recruiting', region: null, since: s.tick, until: s.tick + halfDay,
         });
-        log(s, p, `${pl.name} recruits ${card.name}.`);
+        log(s, p, `${pl.name} recruits ${card.name}.`, 'recruit');
       } else if (card.type === 'site') {
         const region = (cmd.target as { region: number }).region;
         s.sites.push({ uid: inst.uid, cardId: card.id, owner: p, region, built: false, until: s.tick + halfDay });
-        log(s, p, `${pl.name} begins building ${card.name} in ${s.regions[region].name}.`);
+        log(s, p, `${pl.name} begins building ${card.name} in ${s.regions[region].name}.`, 'build');
       } else {
         s.pending.push({
           uid: inst.uid, cardId: card.id, owner: p, target: cmd.target ?? { kind: 'none' }, since: s.tick,
           resolveAt: s.tick + (card.speed === 'quick' ? quickDelay : halfDay),
         });
-        log(s, p, `${pl.name} plays ${card.name}.`);
+        log(s, p, `${pl.name} plays ${card.name}.`, 'play');
       }
       return null;
     }
@@ -246,7 +247,7 @@ export function tick(s: MatchState): void {
   for (const a of s.agents.filter((x) => x.status === 'recruiting' && x.until <= t).sort(byUid)) {
     a.status = 'ready';
     a.since = t;
-    log(s, a.owner, `${getCard(a.cardId).name} is ready.`);
+    log(s, a.owner, `${getCard(a.cardId).name} is ready.`, 'ready');
     runEffects(s, (getCard(a.cardId) as AgentCard).onArrive, { owner: a.owner });
   }
 
@@ -266,7 +267,7 @@ export function tick(s: MatchState): void {
   for (const site of s.sites.filter((x) => !x.built && x.until <= t).sort(byUid)) {
     site.built = true;
     const card = getCard(site.cardId);
-    log(s, site.owner, `${card.name} is built in ${s.regions[site.region].name}.`);
+    log(s, site.owner, `${card.name} is built in ${s.regions[site.region].name}.`, 'built');
     if (card.type === 'site') runEffects(s, card.onBuild, { owner: site.owner, here: site.region });
   }
 
@@ -286,7 +287,7 @@ function dusk(s: MatchState): void {
   }
   for (const x of s.scenario.duskEffects ?? []) {
     runEffects(s, x.effects, { owner: x.player });
-    log(s, x.player, x.text);
+    log(s, x.player, x.text, 'scenario');
   }
 
   const controlled = [0, 1].map((p) => s.regions.filter((r) => r.controller === p).length);
@@ -301,7 +302,7 @@ function dusk(s: MatchState): void {
     else s.winner = 'draw';
   }
   if (s.winner !== null) {
-    log(s, null, s.winner === 'draw' ? 'The match ends in a draw.' : `${s.players[s.winner].name} wins!`);
+    log(s, null, s.winner === 'draw' ? 'The match ends in a draw.' : `${s.players[s.winner].name} wins!`, 'end');
     return;
   }
 
@@ -309,7 +310,7 @@ function dusk(s: MatchState): void {
     s.players[p].gold += s.players[p].income;
     draw(s, p, 1);
   }
-  log(s, null, `Day ${day} ends.`);
+  log(s, null, `Day ${day} ends.`, 'dusk');
 }
 
 // ── Agents ─────────────────────────────────────────────────────────────────
@@ -328,14 +329,14 @@ function resolveCampaign(s: MatchState, a: Agent): void {
     return;
   }
   gainInfluence(s, region, a.owner, a.influence);
-  log(s, a.owner, `${card.name} gains ${a.influence} influence in ${s.regions[region].name}.`);
+  log(s, a.owner, `${card.name} gains ${a.influence} influence in ${s.regions[region].name}.`, 'gain');
   runEffects(s, card.onCampaign, { owner: a.owner, here: region });
   if (s.agents.includes(a)) rest(s, a);
 }
 
 function conflict(s: MatchState, a: Agent, b: Agent): void {
   const region = s.regions[a.region!].name;
-  log(s, null, `${getCard(a.cardId).name} and ${getCard(b.cardId).name} clash in ${region}.`);
+  log(s, null, `${getCard(a.cardId).name} and ${getCard(b.cardId).name} clash in ${region}.`, 'clash');
   const aFirst = hasKeyword(a, 'firstStrike');
   const bFirst = hasKeyword(b, 'firstStrike');
   if (aFirst && !bFirst) {
@@ -364,7 +365,7 @@ function rest(s: MatchState, a: Agent): void {
 function eliminate(s: MatchState, a: Agent): void {
   s.agents.splice(s.agents.indexOf(a), 1);
   s.players[a.owner].archive.push({ uid: a.uid, cardId: a.cardId });
-  log(s, a.owner, `${getCard(a.cardId).name} is eliminated.`);
+  log(s, a.owner, `${getCard(a.cardId).name} is eliminated.`, 'eliminate');
 }
 
 function damageAgent(s: MatchState, a: Agent, amount: number): void {
@@ -405,9 +406,9 @@ function updateControl(s: MatchState, region: number, actor: PlayerId): void {
     else if (at.length === 2) r.controller = actor;
   }
   if (r.controller !== before) {
-    log(s, r.controller, r.controller === null
+    log(s, r.controller ?? before, r.controller === null
       ? `${s.players[before!].name} loses control of ${r.name}.`
-      : `${s.players[r.controller].name} takes control of ${r.name}.`);
+      : `${s.players[r.controller].name} takes control of ${r.name}.`, r.controller === null ? 'lose-control' : 'control');
   }
 }
 
@@ -419,10 +420,10 @@ function resolveAction(s: MatchState, uid: number): void {
   const card = getCard(act.cardId) as ActionCard;
   s.players[act.owner].archive.push({ uid: act.uid, cardId: act.cardId });
   if (!legalTargets(s, act.owner, card.id).some((t) => sameTarget(t, act.target))) {
-    log(s, act.owner, `${card.name} fizzles: its target is gone.`);
+    log(s, act.owner, `${card.name} fizzles: its target is gone.`, 'fizzle');
     return;
   }
-  log(s, act.owner, `${card.name} resolves.`);
+  log(s, act.owner, `${card.name} resolves.`, 'resolve');
   runEffects(s, card.effects, { owner: act.owner, target: act.target });
 }
 
@@ -484,7 +485,7 @@ function runEffects(s: MatchState, effects: Effect[] | undefined, ctx: EffectCon
         const inst: CardInst = { uid: a.uid, cardId: a.cardId };
         if (owner.hand.length < s.config.handSize) owner.hand.push(inst);
         else owner.archive.push(inst);
-        log(s, a.owner, `${getCard(a.cardId).name} is sent back to ${owner.name}'s hand.`);
+        log(s, a.owner, `${getCard(a.cardId).name} is sent back to ${owner.name}'s hand.`, 'bounce');
         break;
       }
       case 'destroySite': {
@@ -494,7 +495,7 @@ function runEffects(s: MatchState, effects: Effect[] | undefined, ctx: EffectCon
         if (!site) break;
         s.sites.splice(s.sites.indexOf(site), 1);
         s.players[site.owner].archive.push({ uid: site.uid, cardId: site.cardId });
-        log(s, site.owner, `${getCard(site.cardId).name} is destroyed.`);
+        log(s, site.owner, `${getCard(site.cardId).name} is destroyed.`, 'destroy');
         break;
       }
     }

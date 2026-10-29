@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ALL_BATTLES, CAMPAIGN, CAMPAIGN_TITLE, type Battle, type StoryLine } from '../data/campaign';
+import { ALL_BATTLES, CAMPAIGN, CAMPAIGN_TITLE, battleMusic, type Battle, type StoryLine } from '../data/campaign';
 import type { MatchSetup } from '../engine/engine';
 import type { PlayerId } from '../engine/types';
 import { portraitArt, sceneArt } from './art';
-import { Match } from './Match';
+import { Match, SoundToggles } from './Match';
+import { useMusic } from './sound';
 
 const STORAGE_KEY = 'recollection.campaign.v1';
 
@@ -40,6 +41,8 @@ type Screen =
 export function Campaign({ onExit }: { onExit: () => void }) {
   const [completed, setCompleted] = useState<string[]>(loadCompleted);
   const [screen, setScreen] = useState<Screen>({ kind: 'map' });
+  // Battles choose their own music inside Match.
+  useMusic(screen.kind === 'map' ? 'theme' : screen.kind === 'battle' ? undefined : 'story');
 
   const startBattle = (battle: Battle) => setScreen({ kind: 'battle', battle, seed: Math.floor(Math.random() * 2 ** 32) });
 
@@ -80,6 +83,7 @@ export function Campaign({ onExit }: { onExit: () => void }) {
         key={screen.seed}
         setup={setup}
         aiThinkEvery={b.opponent.thinkEvery}
+        music={battleMusic(b)}
         briefing={{ title: b.title, objective: b.objective, tips: b.tips }}
         onExit={() => setScreen({ kind: 'map' })}
         onFinish={finish}
@@ -105,7 +109,10 @@ export function Campaign({ onExit }: { onExit: () => void }) {
 
   return (
     <main className="menu campaign">
-      <button type="button" className="link" onClick={onExit}>← Menu</button>
+      <div className="menu-bar">
+        <button type="button" className="link" onClick={onExit}>← Menu</button>
+        <SoundToggles />
+      </div>
       <h1>{CAMPAIGN_TITLE}</h1>
       <p className="tagline">Italy, 1525–1527. A printer&rsquo;s daughter, a Templar treasurer, and the road to the Sack of Rome.</p>
       <p className="muted progress">{completed.length} of {ALL_BATTLES.length} memories recovered</p>

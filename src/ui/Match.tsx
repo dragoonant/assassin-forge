@@ -3,13 +3,30 @@ import { chooseCommand } from '../ai/heuristic';
 import { getCard } from '../data/cards';
 import { TICKS_PER_SECOND } from '../engine/config';
 import { agentsIn, apply, createMatch, dayOf, dayProgress, hasKeyword, legalTargets, type MatchSetup, tick } from '../engine/engine';
-import type { Agent, Command, MatchState, PendingAction, PlayerId, Site, Target } from '../engine/types';
+import type { Agent, Command, LogKind, MatchState, PendingAction, PlayerId, Site, Target } from '../engine/types';
 import { CardView } from './CardView';
+import { sound, useMusic, useSoundPrefs } from './sound';
 
 const HUMAN: PlayerId = 0;
 const AI: PlayerId = 1;
 
 type Selection = { kind: 'card'; uid: number } | { kind: 'agent'; uid: number } | null;
+
+/** Which sound effect each log entry plays, from the human player's point of view. */
+export function sfxFor(kind: LogKind, player: PlayerId | null): string | null {
+  switch (kind) {
+    case 'recruit': case 'send': case 'build': case 'play':
+      return player === HUMAN ? kind : null; // the AI's own moves would be noise
+    case 'gain': case 'clash': case 'eliminate': case 'resolve': case 'fizzle': case 'bounce': case 'destroy': case 'dusk':
+      return kind;
+    case 'control':
+      return player === HUMAN ? 'control' : 'lose-control';
+    case 'lose-control':
+      return player === HUMAN ? 'lose-control' : null;
+    default:
+      return null;
+  }
+}
 
 export interface MatchBriefing {
   title: string;
@@ -17,8 +34,10 @@ export interface MatchBriefing {
   tips?: string[];
 }
 
-export function Match({ setup, aiThinkEvery, briefing, onExit, onFinish, onRetry }: {
+export function Match({ setup, aiThinkEvery, briefing, music, onExit, onFinish, onRetry }: {
   setup: MatchSetup;
+  /** Music track id for this battle. */
+  music?: string;
   /** Ticks between AI decisions: lower is a faster, harder opponent. */
   aiThinkEvery: number;
   /** Campaign battles show their objective and tips. */
@@ -35,6 +54,20 @@ export function Match({ setup, aiThinkEvery, briefing, onExit, onFinish, onRetry
   const [speed, setSpeed] = useState(1);
   const [selected, setSelected] = useState<Selection>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const heardSeq = useRef(-1);
+
+  useMusic(music ?? null);
+
+  // Play sounds for log entries added since the last render.
+  useEffect(() => {
+    for (const l of s.log) {
+      if (l.seq <= heardSeq.current) continue;
+      heardSeq.current = l.seq;
+      if (l.kind === 'end') sound.stinger(s.winner === HUMAN ? 'victory' : 'defeat');
+      const id = sfxFor(l.kind, l.player);
+      if (id) sound.sfx(id);
+    }
+  });
 
   useEffect(() => {
     if (speed === 0) return;
@@ -134,6 +167,7 @@ export function Match({ setup, aiThinkEvery, briefing, onExit, onFinish, onRetry
       <header className="topbar">
         <button type="button" className="link" onClick={onExit}>← {briefing ? 'Campaign' : 'Menu'}</button>
         <Timeline s={s} />
+        <SoundToggles />
         <div className="speed" role="group" aria-label="Speed">
           {[0, 1, 2, 4].map((v) => (
             <button key={v} type="button" className={speed === v ? 'is-on' : ''} onClick={() => setSpeed(v)}>
@@ -220,6 +254,16 @@ export function Match({ setup, aiThinkEvery, briefing, onExit, onFinish, onRetry
 }
 
 // ── Pieces ─────────────────────────────────────────────────────────────────
+
+export function SoundToggles() {
+  const prefs = useSoundPrefs();
+  return (
+    <div className="sound-toggles" role="group" aria-label="Sound">
+      <button type="button" className={prefs.music ? 'is-on' : ''} title="Music" aria-pressed={prefs.music} onClick={() => sound.set('music', !prefs.music)}>♫</button>
+      <button type="button" className={prefs.sfx ? 'is-on' : ''} title="Sound effects" aria-pressed={prefs.sfx} onClick={() => sound.set('sfx', !prefs.sfx)}>🔊</button>
+    </div>
+  );
+}
 
 interface TokenProps {
   s: MatchState;
@@ -351,8 +395,8 @@ function LogPanel({ s }: { s: MatchState }) {
   const entries = s.log.slice(-6).reverse();
   return (
     <section className="log" aria-live="polite">
-      {entries.map((l, i) => (
-        <div key={`${l.tick}-${i}`} className={l.player === HUMAN ? 'me' : l.player === AI ? 'them' : ''}>{l.text}</div>
+      {entries.map((l) => (
+        <div key={l.seq} className={l.player === HUMAN ? 'me' : l.player === AI ? 'them' : ''}>{l.text}</div>
       ))}
     </section>
   );

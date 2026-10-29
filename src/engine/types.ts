@@ -124,10 +124,18 @@ export interface RegionState {
   controller: PlayerId | null;
 }
 
+/** What a log entry is about, so the UI can react to it (sound effects, highlights) without parsing text. */
+export type LogKind =
+  | 'reshuffle' | 'recruit' | 'ready' | 'send' | 'gain' | 'clash' | 'eliminate' | 'build' | 'built'
+  | 'play' | 'resolve' | 'fizzle' | 'bounce' | 'destroy' | 'control' | 'lose-control' | 'dusk' | 'scenario' | 'end';
+
 export interface LogEntry {
+  /** Increases by one per entry for the whole match, even after old entries are trimmed. */
+  seq: number;
   tick: number;
   player: PlayerId | null;
   text: string;
+  kind: LogKind;
 }
 
 /** Per-battle rule changes used by campaign battles. Everything is optional. */
@@ -161,6 +169,7 @@ export interface MatchState {
   pending: PendingAction[];
   winner: PlayerId | 'draw' | null;
   log: LogEntry[];
+  logSeq: number;
 }
 
 export type Command =

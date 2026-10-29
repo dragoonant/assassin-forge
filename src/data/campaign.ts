@@ -9,6 +9,8 @@ export interface StoryLine {
 export interface Battle {
   id: string;
   title: string;
+  /** Music track id (src/assets/audio/music); defaults to the act's. */
+  music?: string;
   place: string;
   date: string;
   regions: [string, string, string];
@@ -28,6 +30,7 @@ export interface Act {
   id: string;
   title: string;
   subtitle: string;
+  music: string;
   battles: Battle[];
 }
 
@@ -118,6 +121,7 @@ export const CAMPAIGN: Act[] = [
     id: 'prologue',
     title: 'Prologue',
     subtitle: 'The Printer’s Daughter',
+    music: 'venice',
     battles: [
       {
         id: 'ink-and-ash',
@@ -203,6 +207,7 @@ export const CAMPAIGN: Act[] = [
     id: 'act-1',
     title: 'Act I',
     subtitle: 'A City of Ledgers',
+    music: 'florence',
     battles: [
       {
         id: 'city-of-ledgers',
@@ -275,6 +280,7 @@ export const CAMPAIGN: Act[] = [
     id: 'act-2',
     title: 'Act II',
     subtitle: 'The River Po',
+    music: 'war',
     battles: [
       {
         id: 'governolo',
@@ -359,6 +365,7 @@ export const CAMPAIGN: Act[] = [
     id: 'act-3',
     title: 'Act III',
     subtitle: 'The Road to Rome',
+    music: 'rome',
     battles: [
       {
         id: 'florence-spared',
@@ -452,6 +459,7 @@ export const CAMPAIGN: Act[] = [
     id: 'act-4',
     title: 'Act IV',
     subtitle: 'The Sack',
+    music: 'rome',
     battles: [
       {
         id: 'trastevere',
@@ -497,6 +505,7 @@ export const CAMPAIGN: Act[] = [
       {
         id: 'la-calamita',
         title: 'La Calamita',
+        music: 'finale',
         place: 'St. Peter’s Square',
         date: 'May 1527',
         regions: ['The Obelisk', 'Borgo', 'Ponte Sant’Angelo'],
@@ -530,3 +539,7 @@ export const CAMPAIGN: Act[] = [
 export const CAMPAIGN_DECKS = { PRINTER, BROTHERHOOD, BLACK_BANDS, BLACK_BANDS_MOURNING, ROME, GREY_CLOAKS, VESCARI_AGENTS, SILK_SPIDER, LANDSKNECHTE, IMPERIAL_ARMY, TREASURER };
 
 export const ALL_BATTLES: Battle[] = CAMPAIGN.flatMap((a) => a.battles);
+
+export function battleMusic(b: Battle): string {
+  return b.music ?? CAMPAIGN.find((a) => a.battles.includes(b))!.music;
+}

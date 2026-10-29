@@ -42,6 +42,17 @@ python scripts/art/install.py --picks art/picks.json
 
 The game shows whatever art is installed in `src/assets/art/` and runs fine without any.
 
+## Audio
+
+Music and sound effects are generated with Audio Studio from `local-ai-studio`; see [`docs/AUDIO.md`](docs/AUDIO.md).
+
+```sh
+node scripts/audio/generate.mjs proofs   # then open audio/out/proofs/index.html
+python scripts/audio/install.py --picks audio/picks.json
+```
+
+The game plays whatever audio is installed in `src/assets/audio/` and is silent without it.
+
 ## Layout
 
 ```
@@ -53,8 +64,9 @@ src/engine/          rules engine: no UI code, deterministic for a given seed
 src/data/            card definitions, starter decks and the campaign, written as plain data
 src/ai/heuristic.ts  rule-based AI opponent
 src/ui/              React UI
-scripts/             balance simulators; art/ holds the Flux Studio generator and installer
+scripts/             balance simulators; art/ and audio/ hold the studio generators and installers
 art/subjects.mjs     every art prompt: 64 cards, 16 story backdrops, and the proof set
+audio/subjects.mjs   every music and sound-effect prompt, and the audio proof set
 ```
 
 The engine works on plain data. The UI, the AI and the simulator all drive it the same way:
